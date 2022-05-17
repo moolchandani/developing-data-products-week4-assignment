@@ -1,0 +1,291 @@
+---
+title: "Developing Data Products Week 4 Assignment"
+author: "Umesh Moolchandani"
+date: "May 15 2022"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(nloptr)
+```
+
+## Reproducible Pitch
+
+This peer assessed assignment has two parts. First, create a Shiny application and deploy it on Rstudio's servers. Second, use Slidify or Rstudio Presenter to prepare a reproducible pitch presentation about your application.
+
+The shiny application prepared in this assignment can be found at:
+
+https://moolchandani.shinyapps.io/shiny_assignment
+
+
+The source codes of server.R and ui.R can be found at:
+
+https://github.com/moolchandani/developing-data-products-week4-assignment
+
+
+## Overview {.smaller}
+
+The shiny app plots graph against miles per gallon (mpg) for different variables from the mtcars dataset.
+
+
+```{r, echo = TRUE}
+head(mtcars)
+```
+
+## Regression Model Analysis {.smaller}
+We'll build linear regression models based on different variables and try to find out the best model fit and compare it with the base model. 
+
+```{r echo = TRUE}
+summary(mtcars)
+```
+
+## UI Code {.smaller}
+
+The ui.R code can be found at:
+
+### Sample Code
+
+```{r, eval=FALSE, echo=TRUE}
+library(shiny)
+
+shinyUI(
+  navbarPage("Cars Data - Prediction of mpg using Regression Analysis",
+             tabPanel("Simple Regression",
+                      (fluidPage(
+                        titlePanel("Predicting Miles per Gallon (mpg) with Simple Regression Models"),
+                        sidebarLayout(
+                          sidebarPanel(
+                            selectInput("variable", "Select Input for Simple Regression",
+                                        c("am","cyl","hp","wt","disp","drat","qsec","gear","carb")),
+                            checkboxInput("simple_model","Show Simple Model",value=FALSE),
+                            submitButton("Submit")
+                            
+                            
+                          ),
+                          mainPanel(
+                            h3("Simple Regression Model"),
+                            textOutput("model"),
+                            tabsetPanel(type = "tabs", 
+                                        tabPanel("BoxPlot", plotOutput("simpleboxplot"),textOutput("simpletext")),
+                                        tabPanel("Summary", verbatimTextOutput("simplesummary")),
+                                        tabPanel("Residual Plots", plotOutput("simpleresidual"))
+                                        
+                                        
+                                        
+                            )
+                          )
+                        )
+                        
+                      ))),
+             
+             tabPanel("Multivariable Regression (Full)",
+                      fluidPage(
+                        titlePanel("Regression with All Variables for mpg Prediction"),
+                        sidebarLayout(
+                          sidebarPanel(
+                            checkboxInput("multimodel","show full regression model",value=FALSE),
+                            submitButton("Submit")
+                          ),
+                          mainPanel(
+                            h3("Multivariable Regression Model"),
+                            textOutput("fullmodel"),
+                            tabsetPanel(type = "tabs", 
+                                        
+                                        tabPanel("Summary Full", verbatimTextOutput("multisummary")),
+                                        tabPanel("Residual Plots Full", plotOutput("multiresidual"))
+    
+                            )
+                            
+                          )
+                        )
+                      )
+                      
+             ),
+             tabPanel("Multivariable Regression (Features Selection)",
+                      fluidPage(
+                        titlePanel("Regression with Best Variables for mpg Prediction"),
+                        sidebarLayout(
+                          sidebarPanel(
+                            checkboxInput("show","Show/Hide Best Variable Subsets",value = FALSE),
+                            checkboxInput("variablenum","Show/Hide Best Variable Number",value = FALSE),
+                            checkboxInput("variables","Show/Hide Best Variables",value = FALSE),
+                            
+                            submitButton("Submit")
+                            
+                            
+                          ),
+                          mainPanel(
+                            h3("Best Subset Regression Model"),
+                            verbatimTextOutput("bestvariablesubsets"),
+                            verbatimTextOutput("variablenumber"),
+                            verbatimTextOutput("bestvariables"),
+                            
+                            tabsetPanel(type = "tabs", 
+                                        
+                                        tabPanel("Summary ", verbatimTextOutput("multisummary2")),
+                                        tabPanel("Residual Plots", plotOutput("multiresidual2"))
+                                        
+                                        
+                                        
+                            )
+                            
+                          )
+                        )
+                      )
+                      
+             )
+             
+  ))
+```
+
+
+## Server Code {.smaller}
+
+The server.R code can be found at:
+
+### Sample Code
+
+```{r, eval=FALSE, echo=TRUE}
+library(shiny)
+library(ggplot2)
+library(olsrr)
+data(mtcars)
+
+mtcars$cyl <- factor(mtcars$cyl)
+mtcars$vs <- factor(mtcars$vs)
+mtcars$gear <- factor(mtcars$gear)
+mtcars$carb <- factor(mtcars$carb)
+mtcars$am <- factor(mtcars$am,labels=c("Automatic","Manual"))
+
+shinyServer(function(input, output) {
+  
+  full_model<-lm(mpg ~ am+cyl+hp+wt+disp+hp+drat+qsec+gear+carb,data=mtcars)
+  best_model<-lm(mpg ~ am+hp+wt+disp+qsec,data=mtcars)
+  
+  formula<-reactive({
+    paste("mpg ~", input$variable)
+    
+  })
+  fit_simple<-reactive({
+    lm(as.formula(formula()),data=mtcars)
+  })
+  
+  output$model<-renderText({
+    if(input$simple_model)
+    {formula()}
+  })
+  
+  
+  
+  output$simpleboxplot <- renderPlot({
+    # check for the input variable
+    if (input$variable == "am") {
+      # am
+      mpgData <- data.frame(mpg = mtcars$mpg, var = factor(mtcars[[input$variable]], labels = c("Automatic", "Manual")))
+      p <- ggplot(mpgData, aes(var, mpg,fill=var)) + 
+        geom_boxplot(alpha=0.3) + 
+        xlab(input$variable)
+      print(p)
+      
+    }
+    else if(input$variable == "cyl"|input$variable == "vs"|input$variable == "gear"|input$variable == "carb"){
+      # cyl and gear
+      mpgData <- data.frame(mpg = mtcars$mpg, var = factor(mtcars[[input$variable]]))
+      p <- ggplot(mpgData, aes(var, mpg,fill=var)) + 
+        geom_boxplot(alpha=0.3) + 
+        xlab(input$variable)
+      print(p)
+      
+    }
+    else{
+      output$simpletext<-renderText({
+        
+        
+        if (input$variable!= "am"|input$variable != "cyl"|input$variable!= "vs"|input$variable!= "gear"|input$variable!= "carb"){
+          
+          print("We don't have a categorical grouping variable!")
+        }
+        
+      })
+      
+    }
+    
+  })
+  
+  
+  output$simplesummary<-renderPrint({
+    summary(fit_simple())
+  })
+  
+  
+  output$simpleresidual<-renderPlot({
+    
+    par(mfrow = c(2, 2), bg="pink")
+    plot(fit_simple())
+  })
+  
+  
+  
+  output$multisummary<-renderPrint({
+    summary(full_model)
+    
+    
+  })
+  
+  output$multiresidual<-renderPlot({
+    
+    par(mfrow = c(2, 2), bg="pink")
+    plot(full_model)
+  })
+  
+  output$bestvariablesubsets<-renderPrint({
+    
+    if(input$show)
+    {ols_step_best_subset(full_model,details=TRUE)}
+    else{"Check Show Hide Best Variable Subsets and Press Submit Button"}
+    
+  })
+  
+  output$fullmodel<-renderText({
+    
+    if(input$multimodel)
+    {print("mpg ~ am+cyl+hp+wt+disp+hp+drat+qsec+gear+carb")}
+  })
+  
+  output$variablenumber<-renderPrint({
+    
+    if(input$variablenum)
+    {adjr<-ols_step_best_subset(fit_multivariable_full,details = TRUE)$adjr
+    which(adjr==max(adjr))}
+    else{"Check Show Hide Best Variable Number and Press Submit Button"}
+    
+  })
+  
+  output$bestvariables<-renderPrint({
+    
+    if(input$variables)
+    {
+      adjr<-ols_step_best_subset(fit_multivariable_full,details = TRUE)$adjr
+      var<-ols_step_best_subset(fit_multivariable_full,details = TRUE)$predictors[which(adjr==max(adjr))]
+      print(var)
+    }
+    else{"Check Show Hide Best Variables and Press Submit Button"}
+    
+  })
+  
+  
+  output$multisummary2<-renderPrint({
+    summary(best_model)
+    
+    
+  })
+  output$multiresidual2<-renderPlot({
+    
+    par(mfrow = c(2, 2), bg="pink")
+    plot(best_model)
+  })
+})
+
+```
+
